@@ -1,57 +1,40 @@
-require_relative 'lock_picker/validator'
+require 'set'
 
 module LockPicker
   class Walker
-    include LockPicker::Validator
-
-    FAIL_MSG = 'There is no solution'.freeze
-
-    def initialize(disc_count:, from:, to:, exclude:)
-      @disc_count = disc_count
+    def initialize(from:, to:, exclude:)
       @from = from
       @to = to
-      @exclude = exclude
-      @route = {}
-
-      validate
+      @exclude = Set.new(exclude)
     end
 
     def call
-      queue = [@from]
-      visited = []
+      queue = [[@from]]
+      visited = Set.new
+
       until queue.empty?
-        current = queue.pop
-        visited << current
-        return calc_route if current == @to
+        path = queue.shift
+        current = path.last
+
+        return path if current == @to
 
         current.each_with_index do |val, position|
-          [-1, 1].each do |increment|
+          [-1, 1].each do |diff|
             copy_current = current.dup
-            copy_current[position] = normalize(val + increment)
+            copy_current[position] = normalize(val + diff)
 
             next if visited.include?(copy_current) || @exclude.include?(copy_current)
 
-            @route[copy_current] = current
-            visited << copy_current
-            queue << copy_current
+            visited.add(copy_current)
+            queue << (path + [copy_current])
           end
         end
       end
 
-      FAIL_MSG
+      nil
     end
 
     protected
-
-    def calc_route
-      res = [@to]
-      step = @route[@to]
-      until step.nil?
-        res.unshift(step)
-        step = @route[step]
-      end
-      res
-    end
 
     def normalize(num)
       return 9 if num.negative?
